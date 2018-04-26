@@ -73,6 +73,12 @@ class TestCtoC(unittest.TestCase):
         src2 = self._run_c_to_c(src)
         self.assertTrue(compare_asts(parse_to_ast(src), parse_to_ast(src2)),
                         src2)
+        
+    def _assert_ctoc_identical(self, src):
+        src2 = self._run_c_to_c(src)
+        self.assertEqual(src,
+                         src2)
+
 
     def test_trivial_decls(self):
         self._assert_ctoc_correct('int a;')
@@ -129,7 +135,7 @@ class TestCtoC(unittest.TestCase):
                 return a;
             }''')
 
-    def test_casts(self):
+    def test_casts_2(self):
         self._assert_ctoc_correct(r'''
             int main() {
                 int a = (int) b + 8;
@@ -314,6 +320,10 @@ class TestCtoC(unittest.TestCase):
             ),
             name='',
         )
+        
+    def test_typedef_multiple(self):
+        self._assert_ctoc_correct('typedef int a, *b;\n')
+        self._assert_ctoc_identical('typedef int a, *b;\n')
 
 
 if __name__ == "__main__":

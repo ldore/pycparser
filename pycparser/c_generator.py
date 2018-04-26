@@ -22,6 +22,47 @@ class CGenerator(object):
 
     def _make_indent(self):
         return ' ' * self.indent_level
+    
+    MERGEABLE_NODE_TYPES = (c_ast.Typedef)
+    
+    def _is_mergeable(self, mergeable_type, mergeable_list, candidate):
+        """
+        Checks if the candidate node is mergeable with elements in the list.
+        """
+        # Only some types are acceptable for merging
+        if isinstance(candidate, self.MERGEABLE_NODE_TYPES):
+            # The first candidate is always mergeable
+            # Additional candidates need to be checked for compatibility
+            if mergeable_list:
+                # Check type compatibility
+                if isinstance(candidate, mergeable_list[0].__class__):
+                    # Resolve the candidate's type
+                    candidate_type = candidate.type
+                    while hasattr(candidate_type, 'type') and not isinstance(candidate_type, c_ast.TypeDecl):
+                        candidate_type = candidate_type.type
+                        
+                    # type should now be a TypeDecl, resolve the type
+                    candidate_type = candidate_type.type
+                        
+                    # Merging occurs if the targeted type is the same INSTANCE
+                    # Identical objects in separate instances are NOT considered mergeable
+                    if candidate_type is mergeable_type:
+                        return True
+            else:
+                return True
+        
+        return False
+    
+    def _merge(self, mergeable_type, mergeable_list):
+        """
+        Merges the types in the mergeable list
+        """
+        if len(mergeable_list) == 1:
+            # A one-element list is not merged, but visited as-is
+            return self.visit(mergeable_list[0])
+        else:
+            # We briefly alter the first node, so that merged nodes are displayed correctly
+            return '\n'.join((self.visit(node) for node in mergeable_list))
 
     def visit(self, node):
         method = 'visit_' + node.__class__.__name__
@@ -156,8 +197,34 @@ class CGenerator(object):
 
     def visit_FileAST(self, n):
         s = ''
+        mergeable_list = []
+        mergeable_type = None
         for ext in n.ext:
-            if isinstance(ext, c_ast.FuncDef):
+            if isinstance(ext, self.MERGEABLE_NODE_TYPES):
+                
+                if self._is_mergeable(mergeable_type, mergeable_list, ext):
+                    # The node can be appended to the list of mergeable nodes.
+                    if mergeable_type is None:
+                        mergeable_type = ext.type
+                        while hasattr(mergeable_type, 'type') and not isinstance(mergeable_type, c_ast.TypeDecl):
+                            mergeable_type = mergeable_type.type
+                        mergeable_type = mergeable_type.type
+                        
+                    mergeable_list.append(ext)
+                    
+                elif mergeable_list:
+                    # The node is not compatible with the current list, 
+                    # Merge and reset the list
+                    s += self._merge(mergeable_type, mergeable_list)
+                    mergeable_type = ext.type
+                    while isinstance(mergeable_type, c_ast.PtrDecl):
+                        mergeable_type = mergeable_type.type
+                    mergeable_list = [ext]
+                else:
+                    continue
+                    
+                
+            elif isinstance(ext, c_ast.FuncDef):
                 s += self.visit(ext)
             elif isinstance(ext, c_ast.Pragma):
                 s += self.visit(ext) + '\n'
