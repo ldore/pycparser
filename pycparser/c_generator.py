@@ -179,11 +179,17 @@ class CGenerator(object):
         return self._generate_struct_union_enum(n, name='enum')
 
     def visit_Enumerator(self, n):
-        return '{indent}{name} = {value},\n'.format(
-            indent=self._make_indent(),
-            name=n.name,
-            value=self.visit(n.value),
-        )
+        if not n.value:
+            return '{indent}{name},\n'.format(
+                indent=self._make_indent(),
+                name=n.name,
+            )
+        else:
+            return '{indent}{name} = {value},\n'.format(
+                indent=self._make_indent(),
+                name=n.name,
+                value=self.visit(n.value),
+            )
 
     def visit_FuncDef(self, n):
         decl = self.visit(n.decl)
@@ -344,8 +350,8 @@ class CGenerator(object):
         for name in n.name:
             if isinstance(name, c_ast.ID):
                 s += '.' + name.name
-            elif isinstance(name, c_ast.Constant):
-                s += '[' + name.value + ']'
+            else:
+                s += '[' + self.visit(name) + ']'
         s += ' = ' + self._visit_expr(n.expr)
         return s
 
@@ -361,10 +367,12 @@ class CGenerator(object):
             body_function = self._generate_struct_union_body
         else:
             assert name == 'enum'
-            members = () if n.values is None else n.values.enumerators
+            members = None if n.values is None else n.values.enumerators
             body_function = self._generate_enum_body
         s = name + ' ' + (n.name or '')
-        if members:
+        if members is not None:
+            # None means no members
+            # Empty sequence means an empty list of members
             s += '\n'
             s += self._make_indent()
             self.indent_level += 2

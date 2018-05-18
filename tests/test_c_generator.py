@@ -109,6 +109,12 @@ class TestCtoC(unittest.TestCase):
                 int b = (int) f;
                 int c = (int*) f;
             }''')
+        self._assert_ctoc_correct(r'''
+            int main() {
+                int a = (int) b + 8;
+                int t = (int) c;
+            }
+        ''')
 
     def test_initlist(self):
         self._assert_ctoc_correct('int arr[] = {1, 2, 3};')
@@ -134,14 +140,6 @@ class TestCtoC(unittest.TestCase):
                 b = - - a;
                 return a;
             }''')
-
-    def test_casts_2(self):
-        self._assert_ctoc_correct(r'''
-            int main() {
-                int a = (int) b + 8;
-                int t = (int) c;
-            }
-        ''')
 
     def test_struct_decl(self):
         self._assert_ctoc_correct(r'''
@@ -221,6 +219,18 @@ class TestCtoC(unittest.TestCase):
               return 0;
             }''')
 
+    def test_issue66(self):
+        # A non-existing body must not be generated
+        # (previous valid behavior, still working)
+        self._assert_ctoc_correct(r'''
+            struct foo;
+            ''')
+        # An empty body must be generated
+        # (added behavior)
+        self._assert_ctoc_correct(r'''
+            struct foo {};
+            ''')
+
     def test_issue83(self):
         self._assert_ctoc_correct(r'''
             void x(void) {
@@ -234,6 +244,11 @@ class TestCtoC(unittest.TestCase):
                 for (int i = 0;;)
                     i;
             }
+            ''')
+
+    def test_issue246(self):
+        self._assert_ctoc_correct(r'''
+            int array[3] = {[0] = 0, [1] = 1, [1+1] = 2};
             ''')
 
     def test_exprlist_with_semi(self):
@@ -291,20 +306,22 @@ class TestCtoC(unittest.TestCase):
         self._assert_ctoc_correct('struct foo_s foo = (struct foo_s){ 1, 2 };')
 
     def test_enum(self):
-        s = textwrap.dedent(r'''
+        self._assert_ctoc_correct(r'''
             enum e
             {
-              a = 1,
+              a,
               b = 2,
               c = 3
             };
-        '''[1:])
-
-        self._assert_ctoc_correct(s)
-
-        ast = parse_to_ast(s)
-        generator = c_generator.CGenerator()
-        assert generator.visit(ast) == s
+        ''')
+        self._assert_ctoc_correct(r'''
+            enum f
+            {
+                g = 4,
+                h,
+                i
+            };
+        ''')
 
     def test_enum_typedef(self):
         self._assert_ctoc_correct('typedef enum EnumName EnumTypedefName;')
